@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标（API 33+）：在 v26 的基础上补 <monochrome>，供系统「主题化图标」
+  使用（Android 13+ 会把单色层染色）。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <background android:drawable="@color/ic_launcher_background" />
+  <foreground android:drawable="@drawable/ic_launcher_foreground_inset" />
+  <monochrome android:drawable="@drawable/ic_launcher_foreground_inset" />
+</adaptive-icon>
