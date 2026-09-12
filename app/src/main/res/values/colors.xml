@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <!-- 启动图标背景(保持) -->
-  <color name="ic_launcher_background">#ffffff</color>
+  <color name="ic_launcher_background">#F5F6F8</color>
 
   <!-- UI 设计 token:精度仪器 + teal 信号色(浅色) -->
   <color name="ds_bg">#F1F3F1</color>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标前景的尺寸包装。
+
+  为什么需要它：自适应图标的画布是 108dp，但系统只会渲染其中的安全区
+  （约 72dp，即 66.7%），四角会按启动器的形状被裁掉。若把原图直接铺满前景，
+  图形既会被裁边、视觉上又显得过大（"很丑"）。
+
+  本文件只做**显示层缩放**，不触碰原始图片字节：scale 0.62 让图形落在安全区内
+  并留出舒适留白。原始 PNG 原样保留在 drawable-nodpi/，逐字节未改动。
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+  android:drawable="@drawable/aureliacode_icon"
+  android:insetLeft="19%"
+  android:insetTop="19%"
+  android:insetRight="19%"
+  android:insetBottom="19%" />

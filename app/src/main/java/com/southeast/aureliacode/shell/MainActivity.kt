@@ -364,6 +364,25 @@ class MainActivity : ComponentActivity() {
     if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
   }
 
+  /**
+   * 显示本地启动页（assets/boot.html）。
+   *
+   * 用途：在引擎凭据就绪之前占据 WebView，避免引擎的 401 文案页被当作首屏。
+   * 该页面不发起任何网络请求，纯本地渲染，因此不受引擎状态影响。
+   */
+  internal fun showBootPage() {
+    try {
+      // 显式确立可见性，不依赖调用前的状态：启动页必须让 webView 可见、
+      // 原生引导页隐藏（showGuide() 会把 webView 置 GONE，若在那之后调用本
+      // 方法而不复位，启动页就永远不可见）。
+      guideView.visibility = View.GONE
+      webView.visibility = View.VISIBLE
+      webView.loadUrl("file:///android_asset/boot.html")
+    } catch (t: Throwable) {
+      Log.w("dsh-engine-auth", "boot page load failed: " + t.message)
+    }
+  }
+
   private fun configureWebView() {
     // WebView 远程调试（debug 构建）：真机/模拟器 CDP 自动化验证 UI 行为。
     // AGP 8 默认不生成 BuildConfig，用 debuggable 标志判断。
@@ -543,24 +562,38 @@ class MainActivity : ComponentActivity() {
       }
       webView.loadUrl(EngineProbe.ENGINE_URL)
     } else {
-      val token = EngineAuth.tokenFromLog(this)
-      webView.loadUrl(if (token != null) EngineProbe.ENGINE_URL + "/?token=" + token else EngineProbe.ENGINE_URL)
-      // 全新安装首启竞态自愈（0.13.3 模拟器实测）：引擎冷启动期 token 行尚未打印，
-      // 首次 refresh/tokenFromLog 均落空 → WebView 载入 401 文案页。后台定期重试，
-      // 拿到 cookie 即注入 CookieManager 并重载一次（用户无感自愈，120s 预算封顶）。
+      // 凭据尚未就绪：**绝不加载引擎 URL**。
+      //
+      // 为什么必须这样（AureliaCode 修复）：早先的实现会退化成
+      // `ENGINE_URL + "/?token=" + token`，而 token 为 null 时就是**裸**
+      // ENGINE_URL —— 引擎对未签名的 Host 请求一律回 401，并把
+      // "dsh web authentication required; reopen the URL printed by dsh web."
+      // 直接渲染给用户（实测截图）。用户看到的是一个白底报错页，误以为是崩溃。
+      //
+      // 现在改为本地启动页：引擎 URL 在拿到 cookie 之前一次都不碰，竞态就从
+      // 「用户可见的报错页」降级为「用户可见的启动中页」。
+      //
+      // 另一个已知事实：构建链会剥离 .credentials.yaml（strip.json 的
+      // secretLeaves），因此 P1「从凭据自 mint cookie」在全新安装时必然不可用，
+      // 只剩 P0（engine.log 令牌交换）——这正是首启竞态窗口的真实成因，所以
+      // 自愈预算从 120s 放宽到 300s，并改为「拿到 cookie 即加载引擎」而非 reload。
+      showBootPage()
       Thread {
-        val deadline = System.currentTimeMillis() + 120_000L
+        val deadline = System.currentTimeMillis() + 300_000L
         while (System.currentTimeMillis() < deadline) {
-          try { Thread.sleep(5_000) } catch (_: InterruptedException) { return@Thread }
+          try { Thread.sleep(4_000) } catch (_: InterruptedException) { return@Thread }
           val cookie = try { EngineAuth.refresh(this) } catch (_: Throwable) { null }
           if (cookie != null) {
             try { android.webkit.CookieManager.getInstance().setCookie(EngineProbe.ENGINE_URL, cookie) } catch (_: Throwable) {}
             runOnUiThread {
-              try { if (!isFinishing && !isDestroyed) webView.reload() } catch (_: Throwable) {}
+              try {
+                if (!isFinishing && !isDestroyed) webView.loadUrl(EngineProbe.ENGINE_URL)
+              } catch (_: Throwable) {}
             }
             return@Thread
           }
         }
+        Log.w("dsh-engine-auth", "cookie 自愈预算耗尽（300s）：引擎可能未启动或令牌行未打印")
       }.apply { isDaemon = true; name = "engine-auth-reload" }.start()
     }
   }
