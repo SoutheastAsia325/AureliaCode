@@ -372,11 +372,17 @@ class MainActivity : ComponentActivity() {
    */
   internal fun showBootPage() {
     try {
-      // 显式确立可见性，不依赖调用前的状态：启动页必须让 webView 可见、
-      // 原生引导页隐藏（showGuide() 会把 webView 置 GONE，若在那之后调用本
-      // 方法而不复位，启动页就永远不可见）。
-      guideView.visibility = View.GONE
-      webView.visibility = View.VISIBLE
+      // **刻意不改动任何视图可见性** —— 这一点很关键，改动会破坏引擎启动。
+      //
+      // onCreate 里引擎的启动守卫是：
+      //   if (!userClosedEngine && webView.visibility != View.VISIBLE && !running) startEngineFlow()
+      // 其中 `webView.visibility != VISIBLE` 用来区分「引导页/首次启动」与
+      // 「从相册/选择器返回且 WebView 已展示」两种情形。若此处把 webView 置为
+      // VISIBLE，该条件恒为 false，**引擎将永远不会被启动**（曾如此实装，属于
+      // 比原报错页更严重的回归）。
+      //
+      // 而引擎未运行时，EngineStartFlow 本来就会 showGuide() 显示原生启动页；
+      // 本方法只是引擎已在跑、但凭据尚未就绪时的兜底，此时 WebView 本就可见。
       webView.loadUrl("file:///android_asset/boot.html")
     } catch (t: Throwable) {
       Log.w("dsh-engine-auth", "boot page load failed: " + t.message)
