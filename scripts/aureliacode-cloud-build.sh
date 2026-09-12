@@ -52,7 +52,10 @@ echo
 # ── 1. 推送源码 ───────────────────────────────────────────────────────────
 # 凭据通过 askpass 临时注入（进程级环境变量），不写入 .git/config，
 # 也不出现在命令行参数里 —— 因此不会留痕在 ps 输出或 git 配置中。
-ASKPASS="$(mktemp "${TMPDIR:-/tmp}/ac-askpass-XXXXXX")"
+# 临时目录：优先 TMPDIR，其次 HOME（本沙箱的 /tmp 不可写，硬编码 /tmp 会直接失败）
+TMP_BASE="${TMPDIR:-$HOME}"
+[ -w "$TMP_BASE" ] || TMP_BASE="$HOME"
+ASKPASS="$(mktemp "$TMP_BASE/ac-askpass-XXXXXX")"
 chmod 700 "$ASKPASS"
 cat > "$ASKPASS" <<'ASKEOF'
 #!/bin/sh
@@ -62,7 +65,7 @@ case "$1" in
   *) echo "" ;;
 esac
 ASKEOF
-cleanup() { rm -f "$ASKPASS"; }
+cleanup() { rm -f "$ASKPASS" "$TMP_BASE/ac-dispatch.out"; }
 trap cleanup EXIT
 
 if [ "$SKIP_PUSH" = "1" ]; then
@@ -81,33 +84,59 @@ fi
 
 # ── 2. 触发 workflow ─────────────────────────────────────────────────────
 echo "-- 2/4 触发 build-apk workflow"
-API="https://api.github.com/repos/${REPO}/actions/workflows/build-apk.yml/dispatches"
-DISPATCH_BODY="$(python3 -c "
+
+# 幂等守卫：同一提交若已有排队/进行中的运行，直接复用它而不重复触发。
+# 为什么需要：GitHub 允许并发触发，重复调用只白烧构建配额（本项目实测误触发出
+# 4 个并发运行，只能逐个取消）。判据 = head_sha 前缀匹配 + 状态未完成。
+EXISTING="$(curl -sS \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${REPO}/actions/workflows/build-apk.yml/runs?per_page=20" \
+  2>/dev/null | python3 -c "
+import json,sys
+sha=sys.argv[1]
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+for r in d.get('workflow_runs', []):
+    if r.get('head_sha','').startswith(sha) and r.get('status') != 'completed':
+        print(r['id']); break
+" "$SHA")"
+
+RUN_ID=""
+if [ -n "$EXISTING" ]; then
+  RUN_ID="$EXISTING"
+  echo "   复用进行中的运行: $RUN_ID"
+else
+  API="https://api.github.com/repos/${REPO}/actions/workflows/build-apk.yml/dispatches"
+  DISPATCH_BODY="$(python3 -c "
 import json,sys
 print(json.dumps({'ref': sys.argv[1], 'inputs': {'abi': sys.argv[2], 'suffix': ''}}))
 " "$BRANCH" "$ABI")"
 
-HTTP_CODE="$(curl -sS -o /tmp/ac-dispatch.out -w '%{http_code}' \
-  -X POST "$API" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  -d "$DISPATCH_BODY" 2>/dev/null)"
+  DISPATCH_OUT="$TMP_BASE/ac-dispatch.out"
+  HTTP_CODE="$(curl -sS -o "$DISPATCH_OUT" -w '%{http_code}' \
+    -X POST "$API" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    -d "$DISPATCH_BODY" 2>/dev/null)"
 
-if [ "$HTTP_CODE" != "204" ]; then
-  echo "触发失败（HTTP $HTTP_CODE）：" >&2
-  sed "s|${GITHUB_TOKEN}|***|g" /tmp/ac-dispatch.out >&2
-  echo >&2
-  echo "若为 404：该仓库没有 .github/workflows/build-apk.yml（请确认推送成功）。" >&2
-  echo "若为 403：Token 缺少 Actions 写权限（需 repo + workflow 权限）。" >&2
-  exit 1
+  if [ "$HTTP_CODE" != "204" ]; then
+    echo "触发失败（HTTP $HTTP_CODE）：" >&2
+    sed "s|${GITHUB_TOKEN}|***|g" "$DISPATCH_OUT" >&2
+    echo >&2
+    echo "若为 404：该仓库没有 .github/workflows/build-apk.yml（请确认推送成功）。" >&2
+    echo "若为 403：Token 缺少 Actions 写权限（需 repo + workflow 权限）。" >&2
+    echo "若为 422：刚推送完时 Actions 可能尚未完成索引，等 10 秒重跑本脚本即可。" >&2
+    exit 1
+  fi
+  echo "   已触发"
 fi
-echo "   已触发"
 
 # ── 3. 等待运行完成 ──────────────────────────────────────────────────────
 echo "-- 3/4 等待构建（最长 90 分钟；可用 Ctrl-C 中断，构建仍在云端继续）"
-RUN_ID=""
 for _ in $(seq 1 60); do
+  [ -n "$RUN_ID" ] && break
   sleep 5
   RUN_ID="$(curl -sS \
     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
