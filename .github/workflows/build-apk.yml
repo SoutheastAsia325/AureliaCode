@@ -103,12 +103,22 @@ jobs:
       - name: 校验 APK 图标资源链（aapt2 权威 dump）
         shell: bash
         run: |
-          set -e
-          APK=$(ls out/aureliacode/*.apk | head -1)
+          # 本步骤**只做验证，绝不允许让构建失败**：它是诊断手段，不是门禁。
+          # 全程 set +e，且每个可能为空的值都先判空。
+          # （初版用 set -e + $(ls ... | head -1)：glob 无匹配时 ls 返回非零，
+          #   set -e 会直接中断整个 job —— 验证步骤反而把构建搞挂，属设计错误。）
+          set +e
+          APK=$(ls out/aureliacode/*.apk 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then echo "未找到 APK，跳过校验"; exit 0; fi
           echo "APK: $APK"
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          BT=""
+          for base in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" /usr/local/lib/android/sdk; do
+            [ -z "$base" ] && continue
+            cand=$(ls -d "$base"/build-tools/* 2>/dev/null | sort -V | tail -1)
+            if [ -n "$cand" ]; then BT="$cand"; break; fi
+          done
           AAPT="$BT/aapt2"
-          if [ ! -x "$AAPT" ]; then echo "aapt2 不可用，跳过"; exit 0; fi
+          if [ -z "$BT" ] || [ ! -x "$AAPT" ]; then echo "aapt2 不可用，跳过校验"; exit 0; fi
           "$AAPT" version
           echo "--- 图标相关资源条目 ---"
           "$AAPT" dump resources "$APK" 2>/dev/null | grep -E "^ *resource .*(ic_launcher|aureliacode_icon)" -A 3 || true
