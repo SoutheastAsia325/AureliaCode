@@ -27,7 +27,7 @@
  * 因为「验不了」不等于「没问题」）。
  */
 import { readFileSync, writeFileSync, mkdirSync, cpSync, symlinkSync, rmSync, existsSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve as resolvePath } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -35,7 +35,10 @@ import { tmpdir } from 'node:os'
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const SEED = join(ROOT, 'scripts', 'snapshot-config', 'seed-settings.yaml')
 
-const engineNm = process.argv[2]
+// 必须转成绝对路径：后面要拿它做软链目标，而**相对路径的软链目标会按链接所在目录
+// 解析**（不是 CWD），于是得到一个悬空软链、依赖全部解析失败。CI 里传的正是相对
+// 路径（.deploy-tmp/...），曾因此让本门禁误报失败。
+const engineNm = process.argv[2] ? resolvePath(process.argv[2]) : ''
 if (!engineNm) {
   console.error('用法: node scripts/check-seed-settings.mjs <dsh 引擎 node_modules 目录>')
   process.exit(2)
@@ -95,10 +98,18 @@ try {
 
   // YAML 解析器要从**引擎树**里解析：本脚本位于工作区，那里没有 node_modules，
   // 直接 import 'yaml' 会 ERR_MODULE_NOT_FOUND。用 createRequire 以引擎树为基准。
-  const req = createRequire(join(engineNm, 'noop.js'))
+  // 多基准尝试：Node 的模块路径规则是「对每个祖先目录取其下 node_modules」，
+  // 所以基准取 <engineNm>/noop.js 与 <engineNm>/../noop.js 覆盖两种形态
+  //（engineNm 自身叫 node_modules，或它是别的名字的目录）。少一个基准就会在
+  // 某些目录命名下解析不到 —— 这种「环境相关」的失败正是本门禁要避免的噪声。
   let YAML = null
-  for (const name of ['yaml', 'js-yaml']) {
-    try { YAML = req(name); break } catch { /* 试下一个 */ }
+  outer:
+  for (const base of [join(engineNm, 'noop.js'), join(engineNm, '..', 'noop.js')]) {
+    let req
+    try { req = createRequire(base) } catch { continue }
+    for (const name of ['yaml', 'js-yaml']) {
+      try { const m = req(name); if (m) { YAML = m; break outer } } catch { /* 试下一个 */ }
+    }
   }
   if (!YAML || typeof (YAML.parse || YAML.load) !== 'function') {
     console.error('✗ 无法在引擎树中解析 YAML 库（yaml / js-yaml）—— 无法验证，拒绝构建')
