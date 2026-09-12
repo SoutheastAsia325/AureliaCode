@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  自适应图标（API 26–32）。
+  自适应图标（API 26）。前景 = 用户原图按 108dp 规范生成的密度副本。
 
-  **刻意不含 <monochrome>**：该子标签是 API 33 才引入的。若把它写进 v26 资源，
-  部分启动器在解析 v26 自适应图标时会因未知子标签整体加载失败，进而回退显示
-  上一次安装缓存的旧图标 —— 这正是「换了图却还是旧图」的一种真实成因。
-  主题化单色图标改由 mipmap-anydpi-v33/ic_launcher.xml 提供。
+  为什么前景不需要任何 inset / 缩放包装：
+  经逐像素测量，用户原图的旋纹包围盒为 x[94..417] y[94..417]（画布 512x512），
+  即内容占画布 63.3%、四边各留白 18.4% —— 恰好落在 Android 自适应图标规范要求
+  的区间内（内容约 66%，四边约 17%）。原图规格本身就是对的，直接铺满前景即可；
+  任何额外缩放都会让它偏小，且会把前景包成 inset 而触发部分定制启动器的兼容
+  回退（显示上一次安装缓存的旧图标）。
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
   <background android:drawable="@color/ic_launcher_background" />
-  <foreground android:drawable="@drawable/ic_launcher_foreground_inset" />
+  <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>
