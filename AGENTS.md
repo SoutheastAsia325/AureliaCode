@@ -1,3 +1,35 @@
+# AGENTS.md — AureliaCode 开发地图
+
+> **本项目 = AureliaCode**，派生自 [`kelai141/dsh-mobile-apk`](https://github.com/kelai141/dsh-mobile-apk)（MIT）。
+> 下方 §1 起的「开发地图」正文是**上游文档的忠实副本**，其中的版本号、路径与
+> 决策记录反映上游历史，**不是本项目的现状**。改动本仓库前请先读本节。
+>
+> ## AureliaCode 相对上游的改动（权威清单）
+>
+> | # | 改动 | 位置 | 说明 |
+> |---|---|---|---|
+> | 1 | 应用名 → `AureliaCode`；包名 → `com.southeast.aureliacode` | `app/build.gradle.kts`、`res/values/strings.xml` | `namespace` 保留 `.shell` 后缀（仅 R 类与清单相对名的解析基准）；源码树 `com/southeast/aureliacode/shell` |
+> | 2 | **引擎路径常量必须等于 `applicationId`** | `scripts/build-snapshot-013.mjs`、`relocate-snapshot.py`、`fix-shebang.py`、`make-snapshot.sh`、`profile-web.cordis.patch.yml` | 快照解压目标与壳侧 `context.filesDir` 必须一致，否则引擎起不来。改包名时这几处必须同步 |
+> | 3 | 图标零修改 | `res/drawable-nodpi/aureliacode_icon.webp` | 原始文件**逐字节**放置（sha256 `765e2ca1…`）。放 `drawable-nodpi` 是为规避 aapt2 的 PNG/JPEG 重编码；自适应图标前景/单色层指向它 |
+> | 4 | Agnes 适配层（本项目核心） | `plugins/dsh-llm-agnes/` | 格式清洗 / 前缀缓存对齐 / 工具调用约束，全部挂在 `llm/stream` waterfall，**不改引擎树、不注册 provider**。42 个单测 |
+> | 5 | 出厂默认设置 | `scripts/snapshot-config/seed-settings.yaml` | 构建期**逐字覆盖**快照 `settings.yaml`。预置 `agnes` 路由骨架（baseURL 留占位）。模板零凭据明文 |
+> | 6 | APK 自更新源锁定 | `UpdateChecker.kt` | `REPO` 置空 + 守卫。**勿改回上游仓库**：那会把上游 APK 装进来覆盖本应用 |
+> | 7 | 版本线独立 | `app/build.gradle.kts` | `versionCode 1` / `versionName 1.0.0`，脱离上游 `0.13.x` |
+> | 8 | 云端构建流水线 | `scripts/aureliacode-cloud-build.sh` | 推送 → 触发 → 轮询 → 取 APK。Token 仅从环境变量读，经 `GIT_ASKPASS` 注入 |
+>
+> ## 本项目的硬约束
+>
+> - **不要在本地编译 APK**（沙箱无 Java/Android SDK）。打包走 GitHub Actions，
+>   入口是 `.github/workflows/build-apk.yml`（自包含，不依赖上游私有旁仓；
+>   `build-snapshot.yml` 才依赖旁仓，本项目不用它）。
+> - **不要触碰运行中的 DeepCode 安装/数据/配置目录**。本仓库的工作根是
+>   `/storage/emulated/0/AI运行沙箱/AureliaCode`。
+> - **凭据纪律**：任何 token 只从环境变量读，不入库、不进日志、不写进 `.git/config`。
+> - `vendor/` 下的 `lib/` 是预编译产物，改其源码需同步重建；本项目的
+>   `plugins/dsh-llm-agnes/lib/` 同样是**入库产物**（保证上线代码与实测一致）。
+>
+> ---
+
 # AGENTS.md — dsh-mobile-apk 开发地图（索引主文件）
 
 > **AI 主动更新条款（必须最先执行）**：本文件是唯一权威入口，采用「主文件索引 + docs/AGENTS/ 详档」结构。**任何代码变更导致描述失真时：① 主文件对应行当轮更新；② 细节写入 docs/AGENTS/ 对应详档（坑→gotchas.md 追加递增编号；版本历史→更新记录表登记，3 条之前的行滚入 changelog-archive.md）。** 若发现文档与源码不一致，以源码为准并当场修正。**查询规范：优先用 grep 在 docs/AGENTS/ 详档内定位（见下方路由表），不要凭记忆猜细节。**

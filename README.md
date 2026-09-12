@@ -1,182 +1,238 @@
-[![QQ群](https://img.shields.io/badge/QQ群-dsh--mobile用户群-12B7F5?logo=tencentqq)](https://qun.qq.com/universal-share/share?ac=1&authKey=C2NW5eWXsV%2FYu5DEkV9Ac%2FqYcXhGCY8C3Lga40KNCfE4AOjzlSeAaRGvWZqc3ADV&busi_data=eyJncm91cENvZGUiOiIxMTA5NDkzOTkyIiwidG9rZW4iOiJjTTRDM3pwNjRLTE8rbkZBVjRDbnFVWlBOdU04aGJaS3FaSG1xZWFXbm5ZNXphbEJBOXdGMGw2N0V3YnpabnhaIiwidWluIjoiMzc1NDY4MDE3NSJ9&data=NzUYIVyoUDsINSstug9aQ6Kf4EUx-hhDegPFaPS-1RD-p_4eE02WN773yEIujclrFYtWRDkLyDa-YDtWj2bKjg&svctype=4&tempid=h5_group_info)
+# AureliaCode
 
-# dsh-mobile-apk — DeepSeek Harness 安卓壳 APK
+> **Agnes 深度定制的安卓端 AI 编码助手**（独立软件，包名 `com.southeast.aureliacode`）
 
-[🌐 English README](README.en.md)
+AureliaCode 是一个**完整独立**的安卓应用：装完即用，内嵌运行时与编码 Agent 引擎，
+不需要 Termux、不需要 ROOT、不需要电脑配合。它把模型能力接在 **Agnes** 上，并针对
+Agnes 在通用 Harness 环境里「工具调用格式不稳、执行卡顿」的问题做了专门的适配层。
 
-![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-blue?style=flat&logo=DeepSeek&logoSize=auto&color=%232D5F9E)
-![Android](https://img.shields.io/badge/Android-blue?style=flat&logo=Android&logoSize=auto&color=%2397CA00)
+派生自开源项目 [`kelai141/dsh-mobile-apk`](https://github.com/kelai141/dsh-mobile-apk)（MIT），
+在其基础上做去标识化与引擎适配改造。上游署名与许可证完整保留（见 [License](#license)）。
 
+---
 
-> **dsh-mobile 生态** · [dsh-shell-termux](https://github.com/kelai141/dsh-shell-termux)（shell）· [dsh-client-ui-responsive](https://github.com/kelai141/dsh-client-ui-responsive)（移动 UI）· [dsh-host-web-compat](https://github.com/kelai141/dsh-host-web-compat)（浏览器兼容）· [dsh-mobile](https://github.com/kelai141/dsh-mobile)（协调仓库，private）
+## 目录
 
-> **0.13.0 正式版**：ADB 真实通道（配对 / 端口发现 / shell 执行 / 授权门禁 / 审计）全链实现并真机验证。
-> - 插件市场适配提示：内置市场牵涉大量第三方插件，绝大多数在手机端不一定可用，以可用性验证与反馈为主。
-> - **插件市场适配警示**：内置市场牵涉大量第三方插件，**绝大多数插件在手机端不一定可用、大概率有 bug**（移动端与桌面端在 WebView 内核/文件系统/权限模型/运行环境差异大）；移动端适配是长期工程，beta 阶段以「可用性验证与反馈」为主，暂不建议当作生产依赖。插件报错请到 [issues](https://github.com/kelai141/dsh-mobile-apk/issues) 反馈（附机型/版本/复现步骤）。
+- [它解决什么问题](#它解决什么问题)
+- [Agnes 适配层（本项目核心）](#agnes-适配层本项目核心)
+- [功能](#功能)
+- [安装](#安装)
+- [首次配置 Agnes](#首次配置-agnes)
+- [从源码构建](#从源码构建)
+- [架构](#架构)
+- [权限](#权限)
+- [许可证与署名](#许可证与署名)
 
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的安卓壳：WebView UI 覆盖
-**内嵌 Termux 运行时快照**（解压即跑，无需 Termux app）、SAF 目录桥、保活前台服务、引擎看门狗、
-运行时在线更新。一个 APK 装完即用：完整的 dsh web agent，且能真实执行 bash。应用名 `DeepCode`
-（图标文字 DeepSearch）、包名 `com.southeast.aureliacode`、版本 `0.13.0-fx-1`（versionCode 26）。
+---
+
+## 它解决什么问题
+
+Agnes 的原生输出与 Harness 期待的严格结构化工具调用之间存在三类偏差，直接表现为
+「模型说要调用工具，但工具没被执行」或「回复卡住不动」：
+
+| 偏差 | 现象 | AureliaCode 的应对 |
+|---|---|---|
+| 把 `tool_calls` 写进正文文本 | 工具调用完全不执行，正文里出现一串 JSON | **强制格式清洗**：流式识别并改写为规范调用块 |
+| 提示词前缀不稳定 | 前缀缓存命中率低，首字延迟高 | **前缀缓存对齐**：稳定序列化 + 漂移监测 |
+| 格式约束不明确 | 时好时坏，同一问题两次结果不同 | **强制工具调用约束**：系统槽注入硬性格式规则 |
+
+## Agnes 适配层（本项目核心）
+
+实现位于 `plugins/dsh-llm-agnes`。**三项能力全部挂在引擎既有的公开接缝
+（`llm/stream` waterfall）上，不修改引擎源码、不注册 provider 插件**——因此你在
+设置页手动配置的任意 Agnes 路由都会自动被覆盖，无需为换 endpoint 重新打包。
+
+### ① 强制格式清洗
+
+覆盖六类实际会遇到的畸形形态：
+
+```
+裸 JSON            {"name":"bash","arguments":{"cmd":"ls"}}
+OpenAI 信封        {"tool_calls":[{"id":..,"type":"function","function":{..}}]}
+function 信封      {"function":{"name":..,"arguments":"{..}"}}
+Markdown 围栏      ```json ... ```
+调用标签           <tool_call>...</tool_call>
+混合              说明文字 + 调用 + 说明文字（文字完整保留）
+```
+
+实现要点：
+
+- **用括号配对解析，不用正则**。工具参数里常有嵌套对象与字符串内的花括号，正则处理不了。
+- **流式安全**。含花括号的文本块不会提前发布——必须等对象闭合才能判定它是正文还是调用，
+  否则会漏判。不含花括号的普通回答依旧即时上屏，打字机效果不受影响。
+- **绝不丢内容**。任何判不出调用的片段一律回落为正文。
+- **判据三重收紧以免误报**（每条都有回归测试）：裸形态必须同时具备 `id` 与 `arguments`；
+  `function` 信封必须有 `id`/`type`/`index` 佐证；无 `id` 的裸形态只在**旁证**成立时接受
+  （处于调用标签/围栏语境，或两个候选彼此紧邻——真实数据几乎不会长成这样）。
+
+判定用「块形态规则」是拿引擎真实的 `BlockAssembler` 实测确立的：含花括号的块其原
+index 必须**完全不出现**，否则消息里会多出一个空文本块。
+
+### ② 前缀缓存对齐
+
+- 工具定义与系统槽做**规范化序列化**（键序稳定、无随机量），保证前缀逐字节一致。
+- **会话级漂移检测**：前缀指纹变化时可指名是哪几个工具增删、字节数怎么变。
+- 设计取舍：会话推进会让系统槽合法演进（工作区目录树、上下文用量），所以「变了」
+  不等于「出错」——因此检测**只记诊断日志、绝不阻断请求**。
+
+### ③ 强制工具调用约束
+
+向**系统槽**（而非最后一条消息）注入硬性格式规则，要求调用时 `content` 为空、
+`tool_calls` 必须含完整的 `id`/`type`/`function.name`/`function.arguments`。
+只在请求确实携带工具时注入（避免诱导模型凭空调用），且幂等（不会重复追加）。
+注入文本是定值，因此不损害前缀缓存。
+
+---
 
 ## 功能
 
-- **内嵌运行时**：xz 快照（arm64 151.6MB / x86_64 158.9MB）内置 node + git + bash + coreutils +
-  dsh + 插件 + pnpm + python/perl/ruby；首启解压 2-4 分钟（`refreshSnapshot`），引擎监听
-  `127.0.0.1:3080`；完全离线；
-- **文件直达会话（F5）**：「使用其他应用打开 / 分享」→ 自动跳转本应用 → 强制新建临时工作区会话
-  处理文件；临时工作区 7 天 TTL 自动清理 + 工作区面板可见（issue #60）；
-- **搜索（grep/glob）**：移动端 ripgrep 平台包（android-arm64，pcre2/NEON 全特性）；
-- **通知提醒**：任务完成自动通知（引擎事件桥 + 看门狗消费）；授权请求等系统通知链；
-- **移动 UI**：响应式插件（手机端抽屉/sheet）；可调字体、沉浸式状态栏、深色主题；
-- **内置控制台**：独立 bash 交互终端（`assets/console.html` + 内嵌 Termux），引擎未运行也可排查；
-- **保活**：前台服务 + 5 秒看门狗（自动重拉挂死引擎）+ 3 秒 UI 轮询 + 崩溃自动回退闸门（UndoGate）；
-- **在线运行时更新**：manifest 驱动的快照替换（下载 → sha256 → 原子切换 → 自动重启），
-  运行时可自更新而无需更新 APK；
-- **APK 自更新（0.13.8）**：启动页「检查更新」按钮手动触发（**不自动检查**）——查 GitHub
-  latest release、按设备 ABI 匹配资产、镜像链逐级回退下载；发现新版时**同一按钮**变为
-  「下载并安装 vX.Y.Z」二次确认，确认后下载 → 首次自动拉起系统「安装未知应用」授权页 →
-  系统安装器（签名不匹配由系统拒绝；应用不静默安装任何东西）；
-- **SAF 桥**：`pickDirectory` 把所选目录映射为真实路径（`/storage/emulated/0/…`）；
-- **设备访问**：所有文件访问；Shizuku 探活示例；
-- **ADB 真实通道（0.13.0）**：真实 `adb pair` SPAKE2 握手 + NSD/mDNS 端口发现，经 adbd（shell uid=2000）执行系统命令（危险命令黑名单）；三道门授权（完全访问档位 / 应用内开关 / 配对码）+ 会话档位实时门控 + 原生审计（`files/audit/audit.ndjson`）；连接端口轮换自愈（5555 回退）。
+- **完整编码 Agent**：文件读写编辑、Shell 执行、文件与网页检索、Skills、计划模式、
+  目标、子代理（subagent）、工作流编排。
+- **内嵌运行时**：自带 bash / node 与工具链快照，首次启动自动解压，不依赖 Termux App。
+- **流式渲染**：Markdown、代码高亮、打字机效果；**思考过程单独成块**，不与正文混排。
+- **会话与工作区**：多会话历史、工作区文件树、`@` 引用文件、附件与图片输入。
+- **手机端设备控制**（可选）：无障碍通道或 ADB 通道，让 AI 能读取界面语义并操作控件、
+  截图。需显式授权，且会话须处于「完全访问」档位。
+- **快照与回滚**：运行时快照事务化替换（暂存 → 原子交换 → 提交），中断可自动恢复；
+  配置快照支持撤销/回退。
+- **深色移动端 UI**：为竖屏窄幅优化，含悬浮球、抽屉式侧栏、安全区处理。
 
-## 下载 / 安装
+## 安装
 
-Release `v0.13.0-fx-1` 提供双 ABI 包（另含快照归档、插件包、MANIFEST 校验清单与发布说明）：
+从本仓库的 [Releases](https://github.com/) 下载对应架构的 APK：
 
-| APK | 适用 |
+| 设备 | 选择 |
 |---|---|
-| `dsh-mobile-apk-v0.13.0-fx-1-arm64.apk` | arm64 设备（真机） |
-| `dsh-mobile-apk-v0.13.0-fx-1-x86_64.apk` | x86_64 模拟器 / 设备 |
+| 绝大多数现代安卓手机（arm64） | `arm64` 产物 |
+| 模拟器 / x86 平板（MuMu、WSA 等） | `x86_64` 产物 |
 
-```sh
-adb install -r -t <apk>    # 同签名覆盖安装
+> **架构选错会崩溃**。debug 签名产物默认按 ABI 命名，真机请只用 `arm64`。
+> 应用为 debug 签名，首次安装需允许「安装未知应用」。
+
+最低要求：Android 8.0（API 26）。目标 API 34（为保留应用私有目录内的原生程序执行能力，
+刻意不追到 35+）。
+
+## 首次配置 Agnes
+
+Agnes 的接入参数（endpoint / 模型 ID / Key）是**运行时信息**，不硬编码在代码里，
+也不会由构建链写死——换 endpoint 不需要重新打包。出厂已预置好 `agnes` 供应商骨架，
+你只需在应用内完成三步：
+
+1. 打开**设置 → 模型**，找到 `Agnes` 供应商。
+2. 把 `baseURL` 换成你的 Agnes endpoint，在 `models` 里填上模型 ID。
+3. 填入 API Key。
+
+出厂预置内容（`scripts/snapshot-config/seed-settings.yaml`，构建时逐字写入快照）：
+
+```yaml
+llm-pi-ai:
+  providers:
+    agnes:
+      displayName: Agnes
+      api: openai-completions          # Agnes 若为自有协议，改这里
+      baseURL: https://REPLACE-WITH-YOUR-AGNES-ENDPOINT/v1
+      apiKeyEnv: AGNES_API_KEY
+      models: []                       # 自定义路由需在此声明模型
 ```
 
-**ABI 必须与设备匹配。** ABI 不匹配会导致引擎启动即崩——node ELF `EM_X86_64` vs `EM_AARCH64`。
-真机选 arm64 包，模拟器选 x86_64 包。
+> `baseURL` 保持占位符时请求会失败并指向该占位符——这样一眼能看出「还没配置」，
+> 而不是误以为网络故障。
 
-## 构建
+## 从源码构建
 
-快照构建与打包在**协调仓库**（[dsh-mobile](https://github.com/kelai141/dsh-mobile)）完成，
-本仓库是壳子仓库。要求：JDK 17+、Android SDK（compileSdk 36）；Gradle 8.11.1 由 wrapper 提供。
+### 云端构建（推荐，也是本项目唯一验证过的路径）
 
-```powershell
-# 快照构建（Termux 源 + 依赖闭包 + pnpm + cordis 权威覆盖 + 瘦身）：
-node scripts\build-snapshot-013.mjs <arm64|x86_64>
+本仓库的 APK **必须走 GitHub Actions 构建**。仓库自带一键流水线：推送源码 →
+触发 workflow → 轮询 → 下载 APK。
 
-# 一键打包（快照 → 注入 → 门禁 → gradle）：
-pwsh scripts\build-apk-013.ps1 -Suffix "-preview"
-# 产物: out\v0.13.0\dsh-mobile-apk-v<ver>-<abi>.apk
+```bash
+export GITHUB_TOKEN=<你的 token>          # 需要 repo + workflow 权限
+bash scripts/aureliacode-cloud-build.sh <owner/repo> arm64
 ```
 
-门禁（`build-apk-013.ps1` 内）：第三方合规（`check-third-party.mjs`，GPL 义务）/ 🔒机密 /
-ELF / cordis 挂载集⊇注入集 / LICENSES 自检（Python 流式）——任一不过即拒打包。
+产物落在 `out/aureliacode/`。Token 只从环境变量读取，经临时 `GIT_ASKPASS` 注入，
+不写入 `.git/config`、不进命令行参数、日志脱敏、退出即清理。
 
-## 桥协议 v1（`window.androidBridge`）
+### 手动触发
 
-应用名 `DeepCode`（图标文字 DeepSearch）、包名 `com.southeast.aureliacode`。
-`androidBridge.version` 返回应用版本号（当前 `0.13.0-fx-1`，versionCode 26），
-页面按它做 feature-detect。下列 ADB 方法为预览授权面——真实通道在 0.13.0 正式版完成。
+在 GitHub 仓库页面进入 **Actions → build-apk → Run workflow**，选择 ABI 后运行。
 
-**同步返回**
+### 本地构建（不推荐）
 
-| 方法 | 签名 | 说明 |
-|---|---|---|
-| `version` | () → string | 应用版本号（`0.13.0-fx-1`），feature-detect 用 |
-| `getSystemDark` | () → boolean | 系统深色模式（绕过部分厂商 WebView `matchMedia` 失效，首帧主题用） |
-| `checkEngine` | () → string | 探测 127.0.0.1:3080；JSON `{running, latencyMs, error?}` |
-| `hasAllFilesAccess` | () → boolean | 是否已授予「所有文件访问」权限（外部工作区要求） |
-| `getPickToken` | () → string | 目录选择桥的一次性会话 token（引擎侧 pick 端点校验） |
-| `copyText` | (text) → boolean | 写入系统剪贴板（WebView `clipboard.writeText` 被拒时的回退） |
-| `getDevLogEnabled` | () → boolean | dev 日志开关状态 |
-| `getAdbState` | () → string | ADB 授权状态视图（三道门状态机）：JSON `{fullAccess, allowSwitch, paired, wirelessDebugOn, message}`（预览） |
-| `discoverAdbPorts` | () → string | 无线调试端口自动扫描（原生 TCP 盲扫）：配对端口候选 JSONArray；无线调试未开时返回 `[]`（预览） |
-| `setAdbPair` | (code, pairPort, connectPort) → boolean | 门3 配对：真执行 `adb pair` 握手；码值只进 argv，不入审计（预览） |
-| `adbShell` | (cmd) → string | ADB shell 执行原语：JSON `{ok, stdout?, stderr?, guidance?}`；未授权 fail-closed（预览） |
+本地构建需要 JDK 17、Android SDK（compileSdk 36）、Node 24、Python 3，以及
+**Git LFS**（`base/*.tar.xz` 是 LFS 对象）。构建链会从 npm 拉取引擎包并重建
+Termux 运行时快照，因此需要稳定网络。
 
-**命令**
+```bash
+git lfs pull
+node scripts/build-snapshot-013.mjs arm64      # 重建运行时快照
+node scripts/build-apk.mjs --abi arm64         # 注入插件 → 门禁 → gradle
+```
 
-| 方法 | 签名 | 说明 |
-|---|---|---|
-| `keepScreenOn` | (enable) | 屏幕常亮开关 |
-| `showNotification` | (title, text) | 通知测试通道（POST_NOTIFICATIONS） |
-| `pickDirectory` | (callbackId) | SAF 目录选择；结果经 `window.__dshBridge.onDirectoryPicked(callbackId, path)` 异步回传 |
-| `pickImage` | (callbackId) | SAF 图片选择；结果同上异步回传 |
-| `setTextZoom` | (percent) | WebView 字体缩放（50–200，设置页滑杆） |
-| `setImmersiveMode` | (enable) | 沉浸式状态栏开关（true = 状态栏常隐） |
-| `downloadDebugLogs` | () | 导出引擎日志 + 环境信息（压缩包，走系统分享/下载） |
-| `requestAllFilesAccess` | () | 打开系统「所有文件访问」授权页（特殊权限） |
-| `restartEngine` | () | 重启引擎进程（EngineService 看门狗拉起） |
-| `shutdownToGuide` | () | 停引擎并回退到测试界面（不自动重启） |
-| `reloadWebUI` | () | 重新加载 Web UI |
-| `openConsole` | () | 打开内置控制台 |
-| `setDevLogEnabled` | (enabled) | 设置 dev 日志开关（开启后日志写入 `dshdata/log/`） |
-| `setAdbAllow` | (enable) | 门2「允许访问」开关（默认关；关闭即通道失败关闭）（预览） |
-| `revokeAdbPair` | () | 回收配对（disconnect + 删 adbkey + 清状态；配套审计）（预览） |
+构建链带门禁（补丁挂载、机密扫描、第三方许可、ELF 检查等），门禁不过即拒绝打包。
 
-桥协议让 APK 与 dsh 版本解耦：页面按 `androidBridge.version` 做特性检测。
+### 测试 Agnes 适配层
 
-## 在线更新协议
+```bash
+cd plugins/dsh-llm-agnes
+npm install && npm test
+```
 
-1. App 拉取 `manifest.json`：`{url, sha256, size}`（默认 `http://10.0.2.2:8899/manifest.json`
-   供模拟器测试；生产指向发布服务器）；
-2. 下载快照 → 校验 SHA-256 → 解压到 staging（不碰线上目录）→ 原子切换 `usr` → 杀掉旧引擎 →
-   看门狗用新运行时重启。
+42 个单元测试覆盖分段解析、格式清洗、约束注入与缓存指纹，全部可离线运行。
 
-测试触发：`adb shell am start -n com.southeast.aureliacode/.MainActivity -a com.southeast.aureliacode.action.UPDATE`；
-状态写入 `files/update-status.txt`。测试服务器：本地起 HTTP 服务提供 `manifest.json` 与快照文件
-（默认指向 `http://10.0.2.2:8899/manifest.json`，模拟器映射宿主机）。
+## 架构
 
-## APK 自更新协议（0.13.8）
+```
+AureliaCode/
+├── app/                          安卓壳（Kotlin）：WebView、前台服务、看门狗、
+│                                 快照解压事务、SAF 桥、设备控制、悬浮球
+├── plugins/
+│   ├── dsh-llm-agnes/            ★ Agnes 适配层（本项目核心，TypeScript）
+│   ├── dsh-android-bridge/       引擎 ↔ 安卓桥
+│   ├── dsh-android-manage/       设备管理工具
+│   ├── dsh-android-linux-env/    写面栅栏与共享目录
+│   ├── dsh-android-file-open/    系统「打开方式」
+│   └── dsh-model-capability/     自定义供应商能力发现
+├── dsh-shell-termux/             引擎 bash / 工具链供给
+├── dsh-client-ui-responsive/     移动端 UI 适配层
+├── dsh-host-web-compat/          浏览器兼容与 polyfill
+├── vendor/                       外部插件（快照撤销、插件市场、模型同步）
+├── scripts/                      构建链与补丁（含云端流水线）
+└── base/                         Git LFS：运行时底座归档
+```
 
-与上面的运行时快照更新**完全分离**（`UpdateChecker` vs `UpdateManager`），只管 APK 本体：
-
-1. **仅手动**：启动页「检查更新」按钮触发，**不自动检查**（169MB 资产不做任何后台/自动行为）；
-2. **元数据**：`api.github.com/repos/kelai141/dsh-mobile-apk/releases/latest` 直连（10/15s 超时）；
-   失败如实报原因（HTTP 码/异常），且**不阻断**既有的引擎快照更新检查（同一按钮接着跑快照检查）；
-3. **资产匹配**：`dsh-mobile-apk-v<版本>-<abi>.apk`，ABI 取 `SUPPORTED_ABIS[0]`（设备原生 ABI——
-   带 ARM 翻译的 x86 设备 abilist 形如 `x86_64,arm64-v8a,x86`，按「含 arm64 即 arm64」会下错包）；
-4. **版本比较**：tag 与 `BuildConfig.VERSION_NAME`（去 `-SN-*` 快照后缀）逐数字组比大小——
-   覆盖语义化版本与 `0.13.7fx-N` 修订号两种命名；
-5. **镜像链下载**：`github.com` 直连 → `gh-proxy.com` → `ghfast.top` 逐级回退，落
-   `Documents/dshdata/updates/`（FileProvider 既有映射内），`.tmp` → rename 原子；有 `.sha256`
-   资产则校验，校验失败即删文件并报错；已下好且校验通过的包不重复下载（授权中断后可直接续继）；
-6. **安装**：未持有「安装未知应用」权限 → 先拉起系统授权页（返回后 `onResume` 自动续继）→
-   FileProvider URI + `ACTION_VIEW` 唤起系统安装器；签名不匹配由系统拒绝。应用**不静默安装**。
-
-这是壳侧唯一的外部 HTTP 出口（其余壳侧 HTTP 全部收敛到本地引擎同源 `127.0.0.1:3080`），
-仅在用户点击按钮时发起。
+运行时形态：APK 内嵌 Termux 快照（`assets/snapshot.tar.xz`），首次启动解压到应用私有
+目录，引擎监听 `127.0.0.1:3080`，WebView 加载引擎自带 Web UI。引擎包在构建期从 npm
+按登记表逐包覆盖（`scripts/snapshot-config/engine-overlay.json`），带 sha512 校验。
 
 ## 权限
 
 | 权限 | 用途 |
 |---|---|
-| `INTERNET` | WebView + 引擎探测 + APK 自更新（仅手动触发） |
-| `POST_NOTIFICATIONS` | 通知通道（API 33+ 运行时请求） |
-| `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` | 保活前台服务 |
-| `MANAGE_EXTERNAL_STORAGE` | 「所有文件访问」（外部工作区要求；特殊权限，用户手动授予） |
-| `REQUEST_INSTALL_PACKAGES` | 唤起系统安装器安装下载的更新包（0.13.8；须用户在系统页显式授权，「安装未知应用」） |
+| `INTERNET` | 访问模型 API |
+| `FOREGROUND_SERVICE` / `POST_NOTIFICATIONS` | 引擎常驻与状态通知 |
+| `RECEIVE_BOOT_COMPLETED` / `WAKE_LOCK` | 开机恢复与保持后台工作 |
+| `MANAGE_EXTERNAL_STORAGE` | 读写工作区（可拒绝，功能降级） |
+| `REQUEST_INSTALL_PACKAGES` | APK 自更新（出厂未配置更新源时不触发） |
+| `SYSTEM_ALERT_WINDOW` | 悬浮球 |
+| `BIND_ACCESSIBILITY_SERVICE` | **可选**设备控制；仅在你于系统设置中开启后生效 |
+| `QUERY_ALL_PACKAGES` | 「打开方式」候选枚举 |
 
-SAF 目录/图片选择无需权限。
+设备控制为**双通道**（无障碍 / ADB），需显式授权且会话处于完全访问档位；两者都不可用时
+一律失败关闭，不做静默降级。
 
-## ABI 与页大小
+## 许可证与署名
 
-arm64 与 x86_64 均已端到端验证；APK 按 ABI 分发（快照内嵌架构相关）。16KB 页构建需在
-16KB 设备上产出（见 docs/design.md §ABI）。
+MIT。见 [LICENSE](LICENSE)。
 
-## License
+本项目派生自 **[kelai141/dsh-mobile-apk](https://github.com/kelai141/dsh-mobile-apk)**
+（Copyright © 2026 kelai141），保留了其全部许可证与第三方声明。上游是一个成熟的
+DeepSeek Harness 安卓壳，本项目的改动集中在：
 
-MIT。第三方组件按各自许可（见依赖声明）。GPL 合规：copyleft 全文三形态在场——快照
-`usr/share/LICENSES/`、仓库 `LICENSES/`、APK `assets/licenses/`。设计文档：`docs/design.md`。
+1. **去标识化**：应用名 → AureliaCode，包名 → `com.southeast.aureliacode`，
+   引擎路径常量与包名对齐，版本线独立为 `1.0.0`。
+2. **Agnes 适配层**：新增 `plugins/dsh-llm-agnes`（格式清洗 / 缓存对齐 / 工具约束）。
+3. **出厂配置**：预置 Agnes 供应商骨架；关闭指向上游仓库的 APK 自更新。
 
-## 致谢与邀请
-
-**感谢全体社区成员的反馈与贡献！** 特别致谢：cdwlll（环境问题反馈）、haitunlang（MIUI12 兼容）、
-TACONailoong（老 WebView 兼容方案）、X-SCI-TECH（PR 贡献）、Yangerwei（文件竞态反馈）、
-gr12-cmd（armv7l 需求）、cmyfqwq（覆盖安装兼容反馈）。
-
-**诚邀各位开发者参与**：欢迎提交 issue、PR、建议与改进。我们特别需要：Android 兼容性测试
-（华为/荣耀/小米等定制 WebView）、armv7l 等更多机型支持、ADB 通道完善、插件生态扩展。
-开发维护规范见各仓库 `AGENTS.md`（开发地图）。
+第三方组件与 GPL 合规三形态见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与
+[LICENSES/](LICENSES/)。
