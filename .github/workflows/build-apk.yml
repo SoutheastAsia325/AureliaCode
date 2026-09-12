@@ -40,11 +40,19 @@ jobs:
       # build-apk.mjs 依赖本仓库顶层 scripts/plugins/vendor/base；apk 仓库 = $GITHUB_WORKSPACE
       DSH_APK_DIR: ${{ github.workspace }}
     steps:
-      - name: 检出本仓库（含 Git LFS 底座归档）
+      - name: 检出本仓库
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          lfs: true
+          # lfs: false 是**刻意**的：本仓库派生自另一仓库，普通 git push 不会
+          # 转移 Git LFS 对象，本仓库的 LFS 存储是空的 —— 开启 lfs: true 会在
+          # "Fetching LFS objects" 直接失败（首次云端构建即栽在这里，两个 ABI
+          # 的 job 都在检出步骤 red）。底座改由下一步从上游按 sha256 校验取回。
+          lfs: false
+
+      - name: 实体化底座归档（从上游 LFS 取回并按 sha256 校验）
+        shell: bash
+        run: bash scripts/materialize-base-lfs.sh base
 
       - name: 准备运行时（node；dsh-client-ui-responsive 的 tsdown 要求 node ^22.18 || >=24.11）
         uses: actions/setup-node@v4
