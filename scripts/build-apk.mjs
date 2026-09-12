@@ -17,9 +17,25 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 // apk 仓库目录：默认 ROOT/dsh-mobile-apk（本仓库布局）；云端 workflow 宿主若=apk 仓库（GITHUB_WORKSPACE），
 // 用 DSH_APK_DIR 覆盖（此时 ROOT 指向作为依赖签出的协调库子目录）。
 const apkDir = process.env.DSH_APK_DIR || join(ROOT, 'dsh-mobile-apk')
-const OUT = join(ROOT, 'out', 'v0.13.0')
+const OUT = join(ROOT, 'out', 'aureliacode')
 const SUFFIX_DEFAULT = '-ci'
-const VER = '0.13.0'
+/**
+ * 版本号单一来源 = app/build.gradle.kts 的 versionName。
+ *
+ * 为什么从 gradle 读而不是在这里写字面量：产物名若与实际版本号各说各话，
+ * 下载页上就会出现「文件名说 v0.13.0、装上去是 1.0.0」这种误导。上游此处
+ * 硬编码 '0.13.0'，版本一升就漂移，故本项目改为读源码。
+ */
+const VER = (() => {
+  try {
+    const g = readFileSync(join(apkDir, 'app', 'build.gradle.kts'), 'utf8')
+    const m = /versionName\s*=\s*"([^"]+)"/.exec(g)
+    if (m) return m[1]
+  } catch {
+    // gradle 文件读不到时退回占位，不阻断构建
+  }
+  return '0.0.0-unknown'
+})()
 
 // ---- 参数解析 ----
 const args = process.argv.slice(2)
@@ -113,7 +129,7 @@ try {
   if (gr.status !== 0) { console.error(`gradle 失败 (${gr.status})`); process.exit(1) }
 
   // ---- 6. 产物拷贝 ----
-  const name = `dsh-mobile-apk-v${VER}${SUFFIX}-${ABI}.apk`
+  const name = `aureliacode-v${VER}${SUFFIX}-${ABI}.apk`
   copyFileSync(join(apkDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk'), join(OUT, name))
   log(`产物: ${join(OUT, name)}`)
   console.log(`=== 完成（${ABI} ${SUFFIX}）===\nAPK=${join(OUT, name)}`)

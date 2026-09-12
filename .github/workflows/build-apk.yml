@@ -1,4 +1,8 @@
-# build-apk.yml — 云端从源重建 dsh-mobile APK（自包含，宿主=本 APK 仓库）
+# build-apk.yml — 云端从源重建 AureliaCode APK（自包含，宿主=本 APK 仓库）
+#
+# 本项目 = AureliaCode（派生自 kelai141/dsh-mobile-apk）。产物落在 out/aureliacode/，
+# 命名 aureliacode-v<versionName>-<abi>.apk，其中版本号由 scripts/build-apk.mjs
+# 从 app/build.gradle.kts 读取（单一来源，避免产物名与实际版本漂移）。
 #
 # 目标：源码更新后云端能「从源重建快照 + 打包 APK」，不依赖协调库。
 # 整套构建链（build-snapshot/inject/门禁脚本、@dsh-android 插件、插架子仓库、vendor、底座、LICENSES）
@@ -91,7 +95,7 @@ jobs:
       - name: 上传 APK 产物（本地下载 debug；不出 Release）
         uses: actions/upload-artifact@v4
         with:
-          name: dsh-mobile-apk-${{ matrix.abi }}${{ github.event.inputs.suffix }}
-          path: out/v0.13.0/*.apk
+          name: aureliacode-${{ matrix.abi }}${{ github.event.inputs.suffix }}
+          path: out/aureliacode/*.apk
           if-no-files-found: error
           retention-days: 30
