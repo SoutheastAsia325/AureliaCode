@@ -166,7 +166,13 @@ object EngineAuth {
   // ── P0: engine.log token → 303 Set-Cookie ──────────────────────────────
 
   private fun exchangeFromLogToken(app: Context): String? {
-    val token = tokenFromLog(File(app.filesDir, "engine.log")) ?: return null
+    val token = tokenFromLog(File(app.filesDir, "engine.log"))
+    if (token == null) {
+      // 首启竞态最可能的落点：引擎冷启动期 token 行尚未打印。
+      // 仅记事实，不记内容 —— 令牌本身绝不进日志。
+      Log.i(TAG, "launch token not found in engine.log yet (cold-start window)")
+      return null
+    }
     return exchange(app, token)
   }
 
@@ -202,6 +208,8 @@ object EngineAuth {
       conn.readTimeout = 4000
       val code = conn.responseCode
       if (code != 303) {
+        // 诊断（不涉密）：303 是官方交换语义；其它状态码意味着令牌已过期
+        // （引擎重启会轮换签名密钥，旧令牌失效）或引擎版本语义变化。
         Log.w(TAG, "token exchange unexpected status: $code")
         return null
       }
