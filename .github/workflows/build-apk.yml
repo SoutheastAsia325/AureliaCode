@@ -100,6 +100,24 @@ jobs:
           set -e
           node scripts/build-apk.mjs --abi "${{ matrix.abi }}" --suffix "${{ github.event.inputs.suffix }}"
 
+      - name: 校验 APK 图标资源链（aapt2 权威 dump）
+        shell: bash
+        run: |
+          set -e
+          APK=$(ls out/aureliacode/*.apk | head -1)
+          echo "APK: $APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -1)
+          AAPT="$BT/aapt2"
+          if [ ! -x "$AAPT" ]; then echo "aapt2 不可用，跳过"; exit 0; fi
+          "$AAPT" version
+          echo "--- 图标相关资源条目 ---"
+          "$AAPT" dump resources "$APK" 2>/dev/null | grep -E "^ *resource .*(ic_launcher|aureliacode_icon)" -A 3 || true
+          echo "--- 自适应图标前景引用解析 ---"
+          "$AAPT" dump xmltree "$APK" --file res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
+          "$AAPT" dump xmltree "$APK" --file res/mipmap-anydpi-v33/ic_launcher.xml 2>/dev/null || true
+          echo "--- drawable 尺寸（确认新图 512x512）---"
+          "$AAPT" dump badging "$APK" 2>/dev/null | grep -E "application-icon|application:" || true
+
       - name: 上传 APK 产物（本地下载 debug；不出 Release）
         uses: actions/upload-artifact@v4
         with:
