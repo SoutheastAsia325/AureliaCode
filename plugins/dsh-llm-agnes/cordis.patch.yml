@@ -1,0 +1,12 @@
+# dsh-llm-agnes bundle patch: mounts the Agnes adaptation layer into the
+# profile's assembly tree under the stable plugin id `dsh-llm-agnes`.
+#
+# Loaded before the model call path matters: it attaches to the engine's
+# `llm/stream` waterfall, which wraps every streaming model call regardless of
+# which provider route the user configured for Agnes. No engine-tree change and
+# no provider registration is involved — a route configured at runtime in the
+# settings UI is covered automatically.
+
+- insert:
+    - id: dsh-llm-agnes
+      name: '@southeast/dsh-llm-agnes'

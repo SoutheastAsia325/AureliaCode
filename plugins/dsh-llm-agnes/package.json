@@ -1,0 +1,30 @@
+{
+  "name": "@southeast/dsh-llm-agnes",
+  "description": "Agnes 适配层：把「tool_calls 写进正文」的非规范流清洗为规范 StreamChunk，并做前缀缓存对齐与工具调用约束注入（AureliaCode 专用）",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./segment": "./lib/segment.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "npm run build && node --test test/segment.test.mjs test/constraint.test.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.5.0",
+    "@deepseek-ai/schemastery": "3.18.2"
+  }
+}

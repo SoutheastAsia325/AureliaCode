@@ -42,6 +42,7 @@ const pluginDirs = [
   join(ROOT, 'plugins', 'dsh-android-manage'),
   join(ROOT, 'plugins', 'dsh-android-linux-env'),
   join(ROOT, 'plugins', 'dsh-android-file-open'),
+  join(ROOT, 'plugins', 'dsh-llm-agnes'),
 ]
 const undo = join(ROOT, 'vendor', 'dsh-undo-savepoint')
 const market = join(ROOT, 'vendor', 'dshmarketplace-plugin')
