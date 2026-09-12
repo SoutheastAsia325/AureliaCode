@@ -26,12 +26,23 @@ if [ ! -d "$BASE_DIR" ]; then
   exit 2
 fi
 
-# 需要实体化的指针（按文件头 4 字节判断是否仍是 LFS 指针：
-# 真实 .tar.xz 以 0xFD '7zXZ' 开头，指针则以 "version https://git-lfs" 开头）
+# 需要实体化的指针。
+#
+# 判定用**正向特征**：真实 .tar.xz 的魔数是 0xFD 0x37 0x7A 0x58 0x5A 0x00
+# （".7zXZ\0"）。凡不以该魔数开头的，就是待实体化的东西。
+#
+# 为什么不用「匹配 LFS 指针文本」的反向判定：早先版本写的是
+# `head -c 20 | grep -q "version https://git-lfs"` —— 而
+# "version https://git-lfs" 恰好 22 字节，被 head 截到 20 字节后是
+# "version https://git-lf"，永远匹配不上，于是脚本误报「无需实体化」，
+# 把未实体化的指针留给了构建链（云端实证：xz 报 File format not recognized）。
+# 正向魔数判定没有这类长度陷阱。
+XZ_MAGIC_HEX="fd377a585a00"
 FILES=()
 for f in "$BASE_DIR"/*.tar.xz; do
   [ -f "$f" ] || continue
-  if head -c 20 "$f" | grep -q "version https://git-lfs"; then
+  magic="$(head -c 6 "$f" | od -An -tx1 | tr -d ' \n')"
+  if [ "$magic" != "$XZ_MAGIC_HEX" ]; then
     FILES+=("$f")
   fi
 done
