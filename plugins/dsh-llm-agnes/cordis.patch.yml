@@ -9,4 +9,4 @@
 
 - insert:
     - id: dsh-llm-agnes
-      name: '@southeast/dsh-llm-agnes'
+      name: '@dsh-android/dsh-llm-agnes'

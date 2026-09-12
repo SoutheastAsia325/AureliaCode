@@ -1,5 +1,5 @@
 {
-  "name": "@southeast/dsh-llm-agnes",
+  "name": "@dsh-android/dsh-llm-agnes",
   "description": "Agnes 适配层：把「tool_calls 写进正文」的非规范流清洗为规范 StreamChunk，并做前缀缓存对齐与工具调用约束注入（AureliaCode 专用）",
   "version": "1.0.0",
   "type": "module",

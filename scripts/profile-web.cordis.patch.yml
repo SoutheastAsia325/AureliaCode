@@ -80,6 +80,13 @@
     - id: android-file-open
       name: '@dsh-android/dsh-android-file-open'
 
+# Agnes 适配层（AureliaCode 核心）：dsh-llm-agnes——把「tool_calls 写进正文」的非规范
+# 输出在 llm/stream waterfall 上清洗为规范 tool-call 块，并做前缀缓存对齐与工具调用约束。
+# 不改引擎树、不注册 provider，因此用户在设置页手动配置的任意 Agnes 路由自动被覆盖。
+- insert:
+    - id: dsh-llm-agnes
+      name: '@dsh-android/dsh-llm-agnes'
+
 # 自定义提供商能力发现（0.13.5 W3，issue #125）：dsh-model-capability——用户手填的
 # 供应商路由没有任何能力元数据（面板只写 id/name/contextWindow/maxTokens），composer
 # 因此没有思考档位可渲染。四段来源按序补齐：被动端点描述符 → 厂商 schema →
