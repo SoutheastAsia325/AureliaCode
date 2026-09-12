@@ -23,7 +23,22 @@ import java.net.URL
 object UpdateChecker {
 
   private const val TAG = "dsh-update"
-  private const val REPO = "kelai141/dsh-mobile-apk"
+  /**
+   * APK 自更新源（`owner/repo`）。
+   *
+   * **AureliaCode 出于安全默认置空 —— 这是一个功能性开关，不是占位符。**
+   *
+   * 原因很具体：本应用派生自 `kelai141/dsh-mobile-apk`，若沿用上游仓库，
+   * 「检查更新」会读到上游的 `v0.13.x` 发布，并在用户确认后**下载安装上游
+   * dsh-mobile APK**，直接覆盖掉 AureliaCode（去标识化当场失效，且包名不同
+   * 会导致安装失败或并存两个应用）。
+   *
+   * 置空后 `checkLatest()` 直接返回「已是最新」，绝不发起网络请求、绝不安装
+   * 任何包。要启用自更新，把本常量改成你自己的仓库（例如 `"yourname/AureliaCode"`），
+   * 并确保该仓库的 release 资产命名与 {@link abiFrom} 的口径一致 —— 这是唯一的
+   * 人工步骤。
+   */
+  private const val REPO = ""
 
   /** 镜像链（gh-proxy 风格前缀；直连永远第一。站点失效自动逐级回退）。 */
   private val MIRRORS = listOf(
@@ -72,6 +87,9 @@ object UpdateChecker {
    * 相等 = 已是最新（快照后缀 -SN-* 不参与比较）。
    */
   fun checkLatest(): CheckResult {
+    // 未配置自更新源：直接判定「已是最新」，不联网、不下载、不安装。
+    // 这条守卫是「绝不把上游 APK 装进 AureliaCode」的唯一保障，勿删。
+    if (REPO.isBlank()) return CheckResult.UpToDate
     // 元数据直连 GitHub API（体积小、可用性远高于 169MB 资产下载）；
     // 资产下载才走镜像链（download()）。API 不可达即失败并如实报告。
     try {

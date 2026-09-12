@@ -1,11 +1,52 @@
-# dsh-mobile 0.13.0 开箱默认（非机密模板；用户配置请在设置界面操作，UI 保存会覆盖本文件）
-# DeepSeek 官方 provider：key 由壳侧私有文件注入（DEEPSEEK_API_KEY 环境变量），此处不落任何凭据。
-# 必须给空对象而非裸键：settings-file 的 section() 对 null 抛 TypeError（llm-deepseek 插件
-# apply 中途死亡，模型页全灭——2026-08-28 模拟器首启实验实锤）。
-llm-deepseek: {}
-  # apiKeyEnv: DEEPSEEK_API_KEY  # 壳体注入，无需手写；无 key 时错误信息引导去设置界面填写
+# AureliaCode 出厂默认设置（非机密模板；用户在设置界面的修改会覆盖本文件）
+#
+# 本文件由构建链**逐字写入**快照的 home/.dsh/settings.yaml（见
+# scripts/build-snapshot-013.mjs 的 SEED_SETTINGS）。因此这里是「出厂默认」
+# 的单一控制点：改这里 = 改新装设备的初始配置。
+#
+# 机密纪律：本文件不得出现任何真实凭据。API Key 只以「环境变量名」的形式
+# 出现（apiKeyEnv），真实值由用户在设置界面填写后落到应用私有目录，不入库。
+# 门禁 check-snapshot-secrets 会校验本模板不含 sk- / apiKey 明文。
 
-# 第三方/自定义 provider（OpenRouter、OpenCode Zen Go 等）请在「设置 → 添加自定义供应商」添加：
-# 面板会写入 llm-pi-ai.providers.<route> 并引导填写 key，无需手写本文件。
+# ── Agnes：AureliaCode 的主模型供应商 ────────────────────────────────────
+#
+# Agnes 走 pi-ai 的 OpenAI 兼容协议通道。之所以预置成「开箱即用但未配置」，
+# 是因为 Agnes 的接入参数（endpoint / 模型 ID / Key）属于运行时信息，不应
+# 硬编码进代码库（也不该由构建链写死——那样换 endpoint 就得重新打包）。
+#
+# 用户要做的只有三件事，全部在「设置 → 模型」里完成：
+#   1. 把 baseURL 换成 Agnes 的真实 endpoint；
+#   2. 在 models 里填上 Agnes 的模型 ID；
+#   3. 填入 API Key（写入 apiKeyEnv 指定的环境变量）。
+#
+# 逐字段说明：
+#   api            —— 线上协议。OpenAI 兼容写法；Agnes 若为自有协议，改这里。
+#   baseURL        —— endpoint 占位。**必须替换**，否则请求会失败并指向本占位符，
+#                     便于一眼看出「还没配置」而不是误以为网络故障。
+#   apiKeyEnv      —— 凭据的环境变量名。此处只登记名字，不落任何值。
+#   displayName    —— 设置页与模型选择器里显示的名字。
+#   models         —— 手写模型清单。自定义路由不在引擎内置目录里，因此**必须**
+#                     在此声明模型，模型选择器才有条目可选。格式：
+#                       models:
+#                         - id: <Agnes 的模型 ID>
+#                           name: <显示名>
+#   compat         —— 线上兼容开关（默认空=按协议默认值）。
 llm-pi-ai:
-  providers: {}
+  providers:
+    agnes:
+      displayName: Agnes
+      api: openai-completions
+      baseURL: https://REPLACE-WITH-YOUR-AGNES-ENDPOINT/v1
+      apiKeyEnv: AGNES_API_KEY
+      models: []
+
+# ── DeepSeek 官方通道（保留：用户可能仍想用官方模型）────────────────────
+# 必须给空对象而非裸键：settings-file 的 section() 对 null 抛 TypeError
+# （会造成 llm-deepseek 插件 apply 中途死亡、模型页全灭）。
+llm-deepseek: {}
+  # apiKeyEnv: DEEPSEEK_API_KEY  # 由壳侧注入，无需手写
+
+# ── 默认模型 ────────────────────────────────────────────────────────────
+# 刻意不预置 agent-default-model：出厂时没有任何可用凭据，预先 pin 一个模型
+# 只会让首启就报错。用户在设置页配好 Agnes 后选择模型即可。
+# 旧版曾因「全删 settings.yaml」导致首启默认 pin 无法解析，故此处显式说明。
