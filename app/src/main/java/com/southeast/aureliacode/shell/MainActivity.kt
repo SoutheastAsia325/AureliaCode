@@ -568,32 +568,48 @@ class MainActivity : ComponentActivity() {
       }
       webView.loadUrl(EngineProbe.ENGINE_URL)
     } else {
-      // 凭据尚未就绪：**绝不加载引擎 URL**。
+      // 手工注入 cookie 失败。**绝不加载裸 ENGINE_URL** —— 引擎对未签名请求一律
+      // 401，并把 "dsh web authentication required; reopen the URL printed by
+      // dsh web." 当页面渲染出来（这正是用户看到的那张白底报错页）。
       //
-      // 为什么必须这样（AureliaCode 修复）：早先的实现会退化成
-      // `ENGINE_URL + "/?token=" + token`，而 token 为 null 时就是**裸**
-      // ENGINE_URL —— 引擎对未签名的 Host 请求一律回 401，并把
-      // "dsh web authentication required; reopen the URL printed by dsh web."
-      // 直接渲染给用户（实测截图）。用户看到的是一个白底报错页，误以为是崩溃。
+      // 改为走**引擎官方的令牌交换路径**，而不是「等我们手工注入的 cookie」：
+      //   GET /?token=<launch token>  →  303 + Set-Cookie
+      // WebView 会自动收下该 Set-Cookie 并用于后续所有同源请求（XHR/WS），
+      // 这正是上游设计的官方交换路线（web-app printUrl）。
       //
-      // 现在改为本地启动页：引擎 URL 在拿到 cookie 之前一次都不碰，竞态就从
-      // 「用户可见的报错页」降级为「用户可见的启动中页」。
+      // 为什么这条比手工 setCookie 更可靠：CookieManager.setCookie 在部分 WebView
+      // 实现上会静默失败（不抛异常也不报错），而 303 的 Set-Cookie 由 WebView 自己
+      // 处理，不经过我们的注入。两条路都走，任一条成功即可进入 UI。
       //
-      // 另一个已知事实：构建链会剥离 .credentials.yaml（strip.json 的
-      // secretLeaves），因此 P1「从凭据自 mint cookie」在全新安装时必然不可用，
-      // 只剩 P0（engine.log 令牌交换）——这正是首启竞态窗口的真实成因，所以
-      // 自愈预算从 120s 放宽到 300s，并改为「拿到 cookie 即加载引擎」而非 reload。
-      showBootPage()
+      // 已知背景：构建链会剥离 .credentials.yaml（strip.json 的 secretLeaves），
+      // 因此 P1「从凭据自 mint cookie」在全新安装时必然不可用，只剩 P0 令牌交换
+      // —— 这就是首启竞态窗口的真实成因。
+      val bootToken = EngineAuth.tokenFromLog(this)
+      if (bootToken != null) {
+        Log.i("dsh-engine-auth", "loading engine via official token-exchange URL")
+        // 带令牌的 URL：引擎 303 → WebView 自动收 Cookie → 落到 UI
+        webView.loadUrl(EngineProbe.ENGINE_URL + "/?token=" + bootToken)
+      } else {
+        Log.i("dsh-engine-auth", "launch token absent at first paint; showing boot page and retrying")
+        showBootPage()
+      }
+      // 兜底自愈：若上面两条路都没能落地（令牌尚未打印 / 交换后仍 401），
+      // 定期重试；一旦拿到 cookie 就手工注入并显式导航到引擎根路径。
       Thread {
         val deadline = System.currentTimeMillis() + 300_000L
         while (System.currentTimeMillis() < deadline) {
           try { Thread.sleep(4_000) } catch (_: InterruptedException) { return@Thread }
           val cookie = try { EngineAuth.refresh(this) } catch (_: Throwable) { null }
           if (cookie != null) {
-            try { android.webkit.CookieManager.getInstance().setCookie(EngineProbe.ENGINE_URL, cookie) } catch (_: Throwable) {}
+            val injected = try {
+              android.webkit.CookieManager.getInstance().setCookie(EngineProbe.ENGINE_URL, cookie); true
+            } catch (_: Throwable) { false }
             runOnUiThread {
               try {
-                if (!isFinishing && !isDestroyed) webView.loadUrl(EngineProbe.ENGINE_URL)
+                if (!isFinishing && !isDestroyed) {
+                  Log.i("dsh-engine-auth", "self-heal navigating to engine (cookieInjected=" + injected + ")")
+                  webView.loadUrl(EngineProbe.ENGINE_URL)
+                }
               } catch (_: Throwable) {}
             }
             return@Thread
