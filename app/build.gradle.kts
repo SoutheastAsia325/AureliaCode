@@ -4,30 +4,24 @@ plugins {
 }
 
 android {
-  namespace = "com.dsharnessmobile.shell"
+  namespace = "com.southeast.aureliacode.shell"
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.dsharnessmobile.shell"
+    applicationId = "com.southeast.aureliacode"
     minSdk = 26
     // targetSdk 34: Android 15+ forbids exec of app-data ELF for targetSdk 35+
     // (the embedded engine, bash, and every child command would need linker64
     // wrappers); 34 keeps native exec working on Android 15/16 devices.
     targetSdk = 34
-    // 0.13.8：versionCode 37（覆盖安装 0.13.7fx-1(36)）。本版主题：
-    // ① 控制协议 V2（列式载荷 428 B/节点 → 54.7 B/行，413 自动降级 view=target，行句柄动作回指）；
-    // ② E6 能力补齐（全局动作面 getSystemActions 驱动、无障碍截屏回落 ADB）；
-    // ③ P2 收口（android_ui_detail 两级披露 + DetailStore、android_privilege_status 结构化 route +
-    //    协议协商）；④ 启动页 APK 自更新（仅手动 + 同按钮二次确认 + 安装授权）；
-    // ⑤ 悬浮球动效 M4-M8；⑥ @ 菜单勾选框（状态由行属性派生 + 原生风格自绘）；
-    // ⑦ 键盘空白带根治（IME inset 施加到 WebView 布局尺寸，apk #197）；
-    // ⑧ 构建门禁链自身缺陷修复（Join-Path 拼写、镜像比对面、协议 V2 门禁）。
-    versionCode = 37
+    // AureliaCode 自有版本线（独立于上游 dsh-mobile 的 0.13.x）。
+    // 1.0.0：首个 AureliaCode 构建 —— 去标识化（包名 com.southeast.aureliacode）+ Agnes 引擎适配。
+    versionCode = 1
     // Snapshot builds append a suffix (e.g. -SN-1-RC13) via -PversionNameSuffix; release builds pass none.
     val snapshotSuffix = providers.gradleProperty("versionNameSuffix").getOrElse("")
     // 版本号单一来源：UI（GuidePageRenderer）、桥（androidBridge.version）、诊断日志、引擎环境变量
     // （DSH_APP_VERSION，见 EngineManager.engineEnv）全部读这里，禁止任何地方再硬编码版本字面量。
-    versionName = "0.13.8" + snapshotSuffix
+    versionName = "1.0.0" + snapshotSuffix
     buildConfigField("String", "TERMUX_VERSION", "\"0.118.3\"")
   }
 

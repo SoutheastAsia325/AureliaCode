@@ -17,7 +17,7 @@
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的安卓壳：WebView UI 覆盖
 **内嵌 Termux 运行时快照**（解压即跑，无需 Termux app）、SAF 目录桥、保活前台服务、引擎看门狗、
 运行时在线更新。一个 APK 装完即用：完整的 dsh web agent，且能真实执行 bash。应用名 `DeepCode`
-（图标文字 DeepSearch）、包名 `com.dsharnessmobile.shell`、版本 `0.13.0-fx-1`（versionCode 26）。
+（图标文字 DeepSearch）、包名 `com.southeast.aureliacode`、版本 `0.13.0-fx-1`（versionCode 26）。
 
 ## 功能
 
@@ -76,7 +76,7 @@ ELF / cordis 挂载集⊇注入集 / LICENSES 自检（Python 流式）——任
 
 ## 桥协议 v1（`window.androidBridge`）
 
-应用名 `DeepCode`（图标文字 DeepSearch）、包名 `com.dsharnessmobile.shell`。
+应用名 `DeepCode`（图标文字 DeepSearch）、包名 `com.southeast.aureliacode`。
 `androidBridge.version` 返回应用版本号（当前 `0.13.0-fx-1`，versionCode 26），
 页面按它做 feature-detect。下列 ADB 方法为预览授权面——真实通道在 0.13.0 正式版完成。
 
@@ -125,7 +125,7 @@ ELF / cordis 挂载集⊇注入集 / LICENSES 自检（Python 流式）——任
 2. 下载快照 → 校验 SHA-256 → 解压到 staging（不碰线上目录）→ 原子切换 `usr` → 杀掉旧引擎 →
    看门狗用新运行时重启。
 
-测试触发：`adb shell am start -n com.dsharnessmobile.shell/.MainActivity -a com.dsharnessmobile.shell.action.UPDATE`；
+测试触发：`adb shell am start -n com.southeast.aureliacode/.MainActivity -a com.southeast.aureliacode.action.UPDATE`；
 状态写入 `files/update-status.txt`。测试服务器：本地起 HTTP 服务提供 `manifest.json` 与快照文件
 （默认指向 `http://10.0.2.2:8899/manifest.json`，模拟器映射宿主机）。
 

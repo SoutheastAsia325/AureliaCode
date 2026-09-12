@@ -31,7 +31,7 @@ PLUGIN_ROOT = 'home/.dsh/profiles/web/node_modules/@dsh-android/'
 # The web profile patch carries the shell-termux paths (bashPath/prefix/home/cwd).
 # They must point at the CURRENT applicationId's data dir — a snapshot built before
 # a package rename keeps the old package path and every bash call fails with
-# "not executable" (2026-08-21 incident: com.dshmobile.shell -> com.dsharnessmobile.shell).
+# "not executable" (2026-08-21 incident: com.dshmobile.shell -> com.southeast.aureliacode).
 PKG_PATCH = 'home/.dsh/profiles/web/cordis.patch.yml'
 PKG_KEYS = ('bashPath', 'prefix', 'home', 'cwd')
 

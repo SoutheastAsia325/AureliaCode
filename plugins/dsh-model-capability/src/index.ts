@@ -104,7 +104,7 @@ let snapshotTried = false
 function diag(message: string): void {
   if (process.env.DSH_MODEL_CAPABILITY_TRACE === '0') return
   try {
-    const home = process.env.DSH_HOME ?? '/data/user/0/com.dsharnessmobile.shell/files/home/.dsh'
+    const home = process.env.DSH_HOME ?? '/data/user/0/com.southeast.aureliacode/files/home/.dsh'
     appendFileSync(`${home}/model-capability.log`, `${new Date().toISOString()} ${message}\n`)
   } catch {
     // 诊断失败不影响主流程

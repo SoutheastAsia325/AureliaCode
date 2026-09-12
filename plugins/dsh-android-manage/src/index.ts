@@ -1364,7 +1364,7 @@ function tools(ctx: Context, priv: PrivilegeFace) {
       }
       if (!priv.execAdbShell) return { ok: false, denied: false, text: 'ADB 执行通道未接通' }
       const wantKb = channel !== 'input'
-      const IME_ID = 'com.dsharnessmobile.shell/.AdbKeyboardService'
+      const IME_ID = 'com.southeast.aureliacode/.AdbKeyboardService'
       if (wantKb) {
         // ADBKeyboard 协议：am broadcast -a ADB_INPUT_TEXT / ADB_CLEAR_TEXT --es msg <文本>。
         // 本应用 0.13.2 起内嵌同协议 IME。F5 修复：ime enable 只入列不生效（广播被静默丢弃）——
@@ -1539,7 +1539,7 @@ function tools(ctx: Context, priv: PrivilegeFace) {
     name: 'android_env_prepare',
     description:
       '设备环境一次性准备（现场实测推荐在长流程开始前跑一次）：① 关闭三项系统动画（dump/tap 后界面立即稳定，减少等待）；'
-      + '② 启用内嵌 ADBKeyboard 协议输入法 com.dsharnessmobile.shell/.AdbKeyboardService（中文 IME 汉字化/丢字的治本手段）。'
+      + '② 启用内嵌 ADBKeyboard 协议输入法 com.southeast.aureliacode/.AdbKeyboardService（中文 IME 汉字化/丢字的治本手段）。'
       + 'restore=true 时恢复动画（输入法不还原）；setImeDefault=true 时把该输入法设为默认（会改变用户全局输入法，谨慎）。'
       + '需 ADB 授权或无障碍通道。',
     parameters: {
@@ -1578,7 +1578,7 @@ function tools(ctx: Context, priv: PrivilegeFace) {
         }
       }
       if (ime) {
-        const IME_ID = 'com.dsharnessmobile.shell/.AdbKeyboardService'
+        const IME_ID = 'com.southeast.aureliacode/.AdbKeyboardService'
         const en = await priv.execAdbShell(`ime enable ${IME_ID}`)
         const list = await priv.execAdbShell(`ime list -s | grep -c dsharnessmobile`)
         const enabled = list.ok && Number.parseInt(list.stdout.trim(), 10) > 0

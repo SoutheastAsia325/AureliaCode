@@ -13,7 +13,7 @@
 #
 # 用法：sh check-prefix-residue.sh [PREFIX]
 set -u
-B="${1:-/data/user/0/com.dsharnessmobile.shell/files/usr}"
+B="${1:-/data/user/0/com.southeast.aureliacode/files/usr}"
 FAIL=0
 
 echo "== 前缀体检: B=$B =="

@@ -17,7 +17,7 @@ Android shell for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-har
 over an **embedded Termux runtime snapshot** (extract-and-run, no Termux app needed), SAF directory
 bridge, keep-alive foreground service, engine watchdog, and online runtime updates. One APK to
 install: it boots a full dsh web agent that can really execute bash. App name `DeepCode` (icon text
-DeepSearch), package `com.dsharnessmobile.shell`, version `0.13.0-fx-1` (versionCode 26).
+DeepSearch), package `com.southeast.aureliacode`, version `0.13.0-fx-1` (versionCode 26).
 
 ## Features
 
@@ -89,7 +89,7 @@ streaming) — any failure rejects the build.
 
 ## Bridge protocol v1 (`window.androidBridge`)
 
-App name `DeepCode` (icon text DeepSearch), package `com.dsharnessmobile.shell`.
+App name `DeepCode` (icon text DeepSearch), package `com.southeast.aureliacode`.
 `androidBridge.version` returns the app version (currently `0.13.0-fx-1`, versionCode 26);
 pages feature-detect on it. The ADB methods below are the preview authorization surface — the real
 channel completes in the 0.13.0 official release.
@@ -140,7 +140,7 @@ The bridge decouples the APK from the dsh version: pages feature-detect on `andr
    atomically swaps `usr` → `usr-old` → new `usr`, then kills the old engine — the watchdog
    restarts it from the new runtime.
 
-Test trigger: `adb shell am start -n com.dsharnessmobile.shell/.MainActivity -a com.dsharnessmobile.shell.action.UPDATE`;
+Test trigger: `adb shell am start -n com.southeast.aureliacode/.MainActivity -a com.southeast.aureliacode.action.UPDATE`;
 status is written to `files/update-status.txt`. Test server: serve `manifest.json` + the snapshot from any
 local HTTP server (default endpoint `http://10.0.2.2:8899/manifest.json` maps the host from the emulator).
 

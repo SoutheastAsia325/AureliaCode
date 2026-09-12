@@ -95,7 +95,7 @@ dsh-mobile-apk/                 ← 独立 git 仓库
 ├── docs/design.md              ← 本文档
 └── app/
     ├── build.gradle.kts        ← AGP 8.9.x, Kotlin 2.0.x, minSdk 26, targetSdk 34, compileSdk 36
-    │                            applicationId com.dsharnessmobile.shell, versionCode 18, versionName 0.12.4
+    │                            applicationId com.southeast.aureliacode, versionCode 18, versionName 0.12.4
     └── src/main/
         ├── AndroidManifest.xml
         ├── assets/
