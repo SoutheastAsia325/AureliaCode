@@ -11,12 +11,15 @@
 #   bash scripts/aureliacode-cloud-build.sh <owner/repo> [abi]
 #
 #   abi 取值 arm64 | x86_64 | both，默认 arm64（本机与绝大多数真机都是 arm64）。
+#   加 --skip-push 可跳过推送，只触发构建（源码已是最新时用）。
 #
 # 依赖：git、curl、python3（均已在沙箱就绪）。不依赖 gh CLI。
 set -uo pipefail
 
 REPO="${1:-}"
 ABI="${2:-arm64}"
+SKIP_PUSH=0
+for a in "$@"; do [ "$a" = "--skip-push" ] && SKIP_PUSH=1; done
 
 if [ -z "$REPO" ]; then
   echo "用法: GITHUB_TOKEN=<token> bash $0 <owner/repo> [arm64|x86_64|both]" >&2
@@ -62,6 +65,9 @@ ASKEOF
 cleanup() { rm -f "$ASKPASS"; }
 trap cleanup EXIT
 
+if [ "$SKIP_PUSH" = "1" ]; then
+  echo "-- 1/4 推送源码（已跳过 --skip-push）"
+else
 echo "-- 1/4 推送源码"
 if ! GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
      git push "https://github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}" --force-with-lease 2>&1 | sed "s|${GITHUB_TOKEN}|***|g"; then
@@ -70,6 +76,7 @@ if ! GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0 \
   echo "  · Token 无 repo 写权限，或已过期" >&2
   echo "  · 分支保护规则拒绝 force-with-lease（首次推送可加 --force）" >&2
   exit 1
+fi
 fi
 
 # ── 2. 触发 workflow ─────────────────────────────────────────────────────
