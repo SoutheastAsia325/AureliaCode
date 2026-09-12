@@ -18,3 +18,6 @@ plugins/*/cbin_*
 
 # Python 编译缓存
 __pycache__/
+
+# 构建产物（APK 约 160MB/个，绝不入库；云端产物通过 Actions artifact 取回）
+out/
