@@ -27,10 +27,16 @@
 #   apiKeyEnv      —— 凭据的环境变量名。此处只登记名字，不落任何值。
 #   displayName    —— 设置页与模型选择器里显示的名字。
 #   models         —— 手写模型清单。自定义路由不在引擎内置目录里，因此**必须**
-#                     在此声明模型，模型选择器才有条目可选。格式：
-#                       models:
-#                         - id: <Agnes 的模型 ID>
-#                           name: <显示名>
+#                     至少列出一个模型。
+#                     ⚠️ 不能写成空列表 `models: []`：引擎的 provider 校验里有一条
+#                     `entries.length === 0 → throw PiAiCatalogError(...)`，且该分支
+#                     **不受 strict/deferred 门控**，必然抛错。已在真实引擎代码上
+#                     实测：
+#                        [strict]   ❌ llm-pi-ai: provider "agnes" resolves no models;
+#                                      the installed catalog does not describe this route,
+#                                      so its models must be listed in configuration
+#                    结果不是「没有模型可选」，而是 **整个引擎启动失败**。
+#                    所以此处预置一个占位模型，用户把它改成 Agnes 的真实模型 ID 即可。
 #   compat         —— 线上兼容开关（默认空=按协议默认值）。
 llm-pi-ai:
   providers:
@@ -39,7 +45,9 @@ llm-pi-ai:
       api: openai-completions
       baseURL: https://REPLACE-WITH-YOUR-AGNES-ENDPOINT/v1
       apiKeyEnv: AGNES_API_KEY
-      models: []
+      models:
+        - id: REPLACE-WITH-AGNES-MODEL-ID
+          name: Agnes（待配置模型 ID）
 
 # ── DeepSeek 官方通道（保留：用户可能仍想用官方模型）────────────────────
 # 必须给空对象而非裸键：settings-file 的 section() 对 null 抛 TypeError

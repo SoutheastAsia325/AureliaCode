@@ -94,6 +94,18 @@ jobs:
           set -e
           node scripts/build-snapshot-013.mjs "${{ matrix.abi }}"
 
+      - name: 门禁：出厂设置必须被引擎接受（seed-settings）
+        shell: bash
+        # 真实事故：出厂设置里给自定义供应商路由写了 `models: []`，引擎校验
+        # （不受 strict/deferred 门控）直接 throw → llm-pi-ai 插件加载失败 →
+        # 引擎启动失败。用户实测到「一直启动失败」。此门禁用**引擎自己的**
+        # resolveProfiles 验证出厂设置，拒绝构建坏配置。
+        # 注意：无法验证时本步骤同样失败 —— 「验不了」不等于「没问题」。
+        run: |
+          ENGINE_NM=".deploy-tmp/snapshot-013/${{ matrix.abi }}/stage/root/usr/lib/node_modules/@deepseek-ai/dsh/node_modules"
+          echo "引擎树: $ENGINE_NM"
+          node scripts/check-seed-settings.mjs "$ENGINE_NM"
+
       - name: 构建 APK ${abi}（注入插件 + 门禁 + gradle + 产物）
         shell: bash
         run: |
